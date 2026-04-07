@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📊 Journal de Trading</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+--bg: #0F1014; --bg2: #18191F; --bg3: #202128; --bg4: #282933;
+--acc: #9580E4; --acc2: rgba(149,128,228,0.15);
+--green: #4DCF85; --green2: rgba(77,207,133,0.15);
+--red: #EE6A6A; --red2: rgba(238,106,106,0.15);
+--yellow: #F5C16C; --blue: #60A5FA;
+--white: #EDEDF5; --gray: #787890; --dgray: #3E3E52; --lgray: #4A4A62;
+--r: 8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--white);height:100vh;overflow:hidden;display:flex}
+
+/* ── SIDEBAR ─────────────────────────────────────────────────────────── */
+.sidebar{width:300px;min-width:300px;background:var(--bg2);border-right:1px solid var(--dgray);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+.sb-logo{padding:18px 16px 12px;border-bottom:1px solid var(--dgray)}
+.sb-logo h1{font-size:14px;font-weight:700;color:var(--acc)}
+.sb-logo p{font-size:11px;color:var(--gray);margin-top:3px}
+.sb-section{padding:14px 16px;border-bottom:1px solid var(--dgray)}
+.sb-label{font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.drop-zone{border:2px dashed var(--dgray);border-radius:var(--r);padding:14px 12px;text-align:center;cursor:pointer;transition:.2s;position:relative;background:var(--bg3);margin-bottom:10px}
+.drop-zone:hover,.drop-zone.over{border-color:var(--acc);background:var(--acc2)}
+.drop-zone.ok{border-style:solid;border-color:var(--green)}
+.drop-zone.err{border-style:solid;border-color:var(--red)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-icon{font-size:22px;margin-bottom:4px}
+.dz-name{font-size:12px;font-weight:600;color:var(--white)}
+.dz-sub{font-size:10px;color:var(--gray);margin-top:2px}
+.dz-badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-bottom:8px}
+.badge-hl{background:var(--acc2);color:var(--acc)}
+.badge-ic{background:rgba(245,193,108,.15);color:var(--yellow)}
+.dz-status{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;margin-top:6px;display:inline-block}
+.ok .dz-status{background:var(--green2);color:var(--green)}
+.err .dz-status{background:var(--red2);color:var(--red)}
+.kpi-mini{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.km{background:var(--bg3);border-radius:var(--r);padding:9px 10px;text-align:center}
+.km-v{font-size:16px;font-weight:700}
+.km-l{font-size:10px;color:var(--gray);margin-top:2px}
+.btn{width:100%;padding:11px;border:none;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;transition:.2s;margin-bottom:7px}
+.btn-p{background:var(--acc);color:#fff}.btn-p:hover{background:#a993f0}.btn-p:disabled{background:var(--dgray);color:var(--gray);cursor:not-allowed}
+.btn-d{background:var(--red2);color:var(--red);border:1px solid var(--red)}.btn-d:hover{background:rgba(238,106,106,.3)}
+.sb-hint{padding:12px 16px;font-size:10px;color:var(--gray);line-height:1.6}
+.sb-hint strong{color:var(--white)}
+
+/* ── MAIN ─────────────────────────────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--dgray);padding:0 20px;flex-shrink:0}
+.tab{padding:14px 20px;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;transition:.15s;user-select:none}
+.tab.active{color:var(--white);border-bottom-color:var(--acc)}
+.tab:hover:not(.active){color:var(--white)}
+.tab-badge{background:var(--acc2);color:var(--acc);font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px}
+.tab-content{flex:1;overflow:auto;display:none}
+.tab-content.active{display:block}
+
+/* ── TRADES TABLE ─────────────────────────────────────────────────────── */
+.tbl-wrap{padding:0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--bg2);color:var(--gray);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:10px 14px;text-align:left;position:sticky;top:0;z-index:2;border-bottom:1px solid var(--dgray);white-space:nowrap}
+thead th.sortable{cursor:pointer;user-select:none}
+thead th.sortable:hover{color:var(--white)}
+thead th.sort-asc::after{content:' ↑';color:var(--acc)}
+thead th.sort-desc::after{content:' ↓';color:var(--acc)}
+tbody tr{border-bottom:1px solid rgba(53,54,74,.5);transition:.1s}
+tbody tr:hover{background:rgba(149,128,228,.05)}
+td{padding:9px 14px;white-space:nowrap}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
+.long{background:var(--green2);color:var(--green)}
+.short{background:var(--red2);color:var(--red)}
+.win{background:var(--green2);color:var(--green)}
+.loss{background:var(--red2);color:var(--red)}
+.src-hl{background:var(--acc2);color:var(--acc)}
+.src-ic{background:rgba(245,193,108,.12);color:var(--yellow)}
+.tbl-filter{display:flex;gap:8px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--dgray);flex-shrink:0;align-items:center;flex-wrap:wrap}
+.filt-btn{padding:5px 12px;border-radius:6px;border:1px solid var(--dgray);background:var(--bg3);color:var(--gray);font-size:11px;font-weight:600;cursor:pointer;transition:.15s}
+.filt-btn.active{border-color:var(--acc);color:var(--acc);background:var(--acc2)}
+.tbl-empty{text-align:center;padding:80px 20px;color:var(--gray)}
+.tbl-empty .ei{font-size:44px;margin-bottom:14px}
+
+/* ── DASHBOARD ────────────────────────────────────────────────────────── */
+.dash-wrap{padding:20px;display:flex;flex-direction:column;gap:18px}
+.period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.period-bar span{font-size:11px;font-weight:700;color:var(--gray);margin-right:4px;text-transform:uppercase;letter-spacing:.6px}
+.pb{padding:7px 16px;border-radius:20px;border:1px solid var(--dgray);background:var(--bg3);color:var(--gray);font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.pb.active{border-color:var(--acc);color:var(--acc);background:var(--acc2)}
+.pb:hover:not(.active){color:var(--white);border-color:var(--lgray)}
+.date-inputs{display:flex;gap:8px;align-items:center;margin-left:8px}
+.date-inputs input{padding:6px 10px;border-radius:6px;border:1px solid var(--dgray);background:var(--bg3);color:var(--white);font-size:11px;outline:none;width:130px}
+.date-inputs input:focus{border-color:var(--acc)}
+.date-inputs span{font-size:11px;color:var(--gray)}
+#custom-dates{display:none}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.kc{background:var(--bg2);border:1px solid var(--dgray);border-radius:var(--r);padding:14px;transition:.2s}
+.kc:hover{border-color:var(--lgray)}
+.kc-lbl{font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.kc-val{font-size:22px;font-weight:700;line-height:1}
+.kc-sub{font-size:10px;color:var(--gray);margin-top:5px}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.chart-card{background:var(--bg2);border:1px solid var(--dgray);border-radius:var(--r);padding:16px}
+.chart-card.wide{grid-column:1/-1}
+.chart-title{font-size:12px;font-weight:700;color:var(--white);margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.chart-title span{color:var(--gray);font-weight:400;font-size:11px}
+.chart-container{position:relative;height:220px}
+.chart-container.tall{height:280px}
+.analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.an-card{background:var(--bg2);border:1px solid var(--dgray);border-radius:var(--r);overflow:hidden}
+.an-title{padding:12px 14px;font-size:11px;font-weight:700;color:var(--acc);background:var(--bg3);border-bottom:1px solid var(--dgray);text-transform:uppercase;letter-spacing:.5px}
+.an-table{width:100%;border-collapse:collapse;font-size:11px}
+.an-table th{padding:8px 12px;text-align:left;color:var(--gray);font-size:10px;font-weight:700;background:var(--bg3);border-bottom:1px solid var(--dgray);text-transform:uppercase}
+.an-table td{padding:8px 12px;border-bottom:1px solid rgba(53,54,74,.4)}
+.an-table tr:last-child td{border:none}
+.an-table tr:hover td{background:rgba(149,128,228,.04)}
+.no-data{text-align:center;padding:40px;color:var(--gray);font-size:12px}
+
+/* ── BE TAG ───────────────────────────────────────────────────────────── */
+.be{background:rgba(96,165,250,0.15);color:var(--blue)}
+
+/* ── DASH FILTERS ─────────────────────────────────────────────────────── */
+.dash-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--dgray);border-radius:var(--r);padding:12px 14px}
+.dash-filters-row{display:flex;gap:12px;flex-wrap:wrap;width:100%}
+.df-group{display:flex;flex-direction:column;gap:5px;min-width:140px}
+.df-label{font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px}
+.df-select{padding:6px 10px;border-radius:6px;border:1px solid var(--dgray);background:var(--bg3);color:var(--white);font-size:11px;outline:none;cursor:pointer;width:100%}
+.df-select:focus{border-color:var(--acc)}
+.df-select option{background:var(--bg3)}
+
+/* ── SCROLLBAR ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--dgray);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- ─── SIDEBAR ─────────────────────────────────────────────────────── -->
+<div class="sidebar">
+<div class="sb-logo">
+<h1>📊 Journal de Trading</h1>
+<p>Importateur automatique de trades</p>
+</div>
+
+<div class="sb-section">
+<div class="sb-label">Sources</div>
+<div>
+<span class="dz-badge badge-hl">⚡ Hyperliquid</span>
+<div class="drop-zone" id="dz-hl" ondragover="dzOver(event,'hl')" ondragleave="dzOut('hl')" ondrop="dzDrop(event,'hl')">
+<input type="file" accept=".csv" onchange="onFile(event,'hl')">
+<div class="dz-icon">📄</div>
+<div class="dz-name">trade_history.csv</div>
+<div class="dz-sub">Glisse ou clique pour importer</div>
+<div id="st-hl"></div>
+</div>
+</div>
+<div>
+<span class="dz-badge badge-ic">📈 IC Markets MT5</span>
+<div class="drop-zone" id="dz-ic" ondragover="dzOver(event,'ic')" ondragleave="dzOut('ic')" ondrop="dzDrop(event,'ic')">
+<input type="file" accept=".xlsx,.xls" onchange="onFile(event,'ic')">
+<div class="dz-icon">📊</div>
+<div class="dz-name">icmarkets_mt5_position_history.xlsx</div>
+<div class="dz-sub">Glisse ou clique pour importer</div>
+<div id="st-ic"></div>
+</div>
+</div>
+</div>
+
+<div class="sb-section">
+<div class="sb-label">Résumé</div>
+<div class="kpi-mini">
+<div class="km"><div class="km-v" id="m-total" style="color:var(--blue)">0</div><div class="km-l">Total Trades</div></div>
+<div class="km"><div class="km-v" id="m-wr" style="color:var(--yellow)">—</div><div class="km-l">Win Rate</div></div>
+<div class="km"><div class="km-v" id="m-pnl">$0</div><div class="km-l">P&L Total</div></div>
+<div class="km"><div class="km-v" id="m-avg" style="color:var(--gray)">$0</div><div class="km-l">Gain Moyen</div></div>
+</div>
+</div>
+
+<div class="sb-section">
+<div class="sb-label">Actions</div>
+<button class="btn btn-p" id="btn-exp" onclick="exportXLSX()" disabled>⬇️ Exporter les données (.xlsx)</button>
+<button class="btn btn-d" onclick="clearAll()">🗑️ Effacer tout</button>
+</div>
+
+<div class="sb-hint">
+<strong>Mode d'emploi :</strong><br>
+1. Importe ton CSV Hyperliquid et/ou ton XLSX ICMarkets<br>
+2. Explore les trades dans l'onglet <em>Trades</em><br>
+3. Analyse ta performance dans <em>Dashboard</em><br>
+4. Filtre par période — tout se recalcule en direct
+</div>
+</div>
+
+<!-- ─── MAIN ─────────────────────────────────────────────────────────── -->
+<div class="main">
+<div class="tabs">
+<div class="tab active" onclick="switchTab('trades',this)">Trades <span class="tab-badge" id="tb-count">0</span></div>
+<div class="tab" onclick="switchTab('dashboard',this)">Dashboard</div>
+</div>
+
+<!-- TRADES TAB -->
+<div class="tab-content active" id="tab-trades">
+<div class="tbl-filter">
+<span style="font-size:11px;font-weight:700;color:var(--gray)">FILTRER :</span>
+<button class="filt-btn active" onclick="setTblFilter('all',this)">Tous</button>
+<button class="filt-btn" onclick="setTblFilter('hl',this)">⚡ Hyperliquid</button>
+<button class="filt-btn" onclick="setTblFilter('ic',this)">📈 ICMarkets</button>
+<button class="filt-btn" onclick="setTblFilter('win',this)">✅ Wins</button>
+<button class="filt-btn" onclick="setTblFilter('loss',this)">❌ Losses</button>
+<button class="filt-btn" onclick="setTblFilter('long',this)">↑ LONG</button>
+<button class="filt-btn" onclick="setTblFilter('short',this)">↓ SHORT</button>
+</div>
+<div class="tbl-wrap">
+<div id="tbl-empty" class="tbl-empty"><div class="ei">📂</div><p>Importe un fichier pour voir tes trades ici</p></div>
+<table id="trades-tbl" style="display:none">
+<thead><tr>
+<th>#</th>
+<th class="sortable" onclick="sortBy('source')">Source</th>
+<th class="sortable" onclick="sortBy('openDate')">Date Entrée</th>
+<th class="sortable" onclick="sortBy('closeDate')">Date Sortie</th>
+<th class="sortable" onclick="sortBy('symbol')">Actif</th>
+<th class="sortable" onclick="sortBy('direction')">Direction</th>
+<th class="sortable" onclick="sortBy('entry')">Prix Entrée</th>
+<th class="sortable" onclick="sortBy('exit')">Prix Sortie</th>
+<th class="sortable" onclick="sortBy('qty')">Quantité</th>
+<th class="sortable" onclick="sortBy('pnl')">P&amp;L ($)</th>
+<th class="sortable" onclick="sortBy('result')">Résultat</th>
+</tr></thead>
+<tbody id="trades-body"></tbody>
+</table>
+</div>
+</div>
+
+<!-- DASHBOARD TAB -->
+<div class="tab-content" id="tab-dashboard">
+<div class="dash-wrap">
+
+<!-- Filtres période -->
+<div class="period-bar">
+<span>Période :</span>
+<button class="pb" onclick="setPeriod('all',this)">Tout</button>
+<button class="pb" onclick="setPeriod('today',this)">Aujourd'hui</button>
+<button class="pb" onclick="setPeriod('yesterday',this)">Hier</button>
+<button class="pb" onclick="setPeriod('week',this)">Cette semaine</button>
+<button class="pb" onclick="setPeriod('lastweek',this)">Semaine dernière</button>
+<button class="pb active" onclick="setPeriod('month',this)">Ce mois</button>
+<button class="pb" onclick="setPeriod('lastmonth',this)">Mois dernier</button>
+<button class="pb" onclick="setPeriod('quarter',this)">Trimestre</button>
+<button class="pb" onclick="setPeriod('custom',this)">📅 Perso</button>
+<div id="custom-dates" class="date-inputs">
+<input type="date" id="dt-start" onchange="applyCustom()">
+<span>→</span>
+<input type="date" id="dt-end" onchange="applyCustom()">
+</div>
+</div>
+
+<!-- Filtres avancés -->
+<div class="dash-filters">
+<div class="dash-filters-row">
+<div class="df-group">
+<div class="df-label">Plateforme</div>
+<select class="df-select" id="f-platform" onchange="renderDashboard()">
+<option value="all">Toutes</option>
+<option value="hl">⚡ Hyperliquid</option>
+<option value="ic">📈 ICMarkets</option>
+</select>
+</div>
+<div class="df-group">
+<div class="df-label">Actif</div>
+<select class="df-select" id="f-symbol" onchange="renderDashboard()">
+<option value="all">Tous</option>
+</select>
+</div>
+<div class="df-group">
+<div class="df-label">Direction</div>
+<select class="df-select" id="f-direction" onchange="renderDashboard()">
+<option value="all">Toutes</option>
+<option value="LONG">↑ LONG</option>
+<option value="SHORT">↓ SHORT</option>
+</select>
+</div>
+<div class="df-group">
+<div class="df-label">Résultat</div>
+<select class="df-select" id="f-result" onchange="renderDashboard()">
+<option value="all">Tous</option>
+<option value="win">✅ Wins</option>
+<option value="loss">❌ Losses</option>
+</select>
+</div>
+</div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid" id="kpi-grid">
+<div class="kc"><div class="kc-lbl">Total Trades</div><div class="kc-val" id="k-total" style="color:var(--blue)">—</div></div>
+<div class="kc"><div class="kc-lbl">Win Rate</div><div class="kc-val" id="k-wr" style="color:var(--yellow)">—</div></div>
+<div class="kc"><div class="kc-lbl">P&L Total</div><div class="kc-val" id="k-pnl">—</div></div>
+<div class="kc"><div class="kc-lbl">Profit Factor</div><div class="kc-val" id="k-pf" style="color:var(--acc)">—</div></div>
+<div class="kc"><div class="kc-lbl">Expectancy ($)</div><div class="kc-val" id="k-exp">—</div></div>
+<div class="kc"><div class="kc-lbl">Gain Moyen</div><div class="kc-val" id="k-avg-w" style="color:var(--green)">—</div></div>
+<div class="kc"><div class="kc-lbl">Perte Moyenne</div><div class="kc-val" id="k-avg-l" style="color:var(--red)">—</div></div>
+<div class="kc"><div class="kc-lbl">Meilleur Trade</div><div class="kc-val" id="k-best" style="color:var(--green)">—</div></div>
+<div class="kc"><div class="kc-lbl">Pire Trade</div><div class="kc-val" id="k-worst" style="color:var(--red)">—</div></div>
+<div class="kc"><div class="kc-lbl">Trades LONG</div><div class="kc-val" id="k-long" style="color:var(--green)">—</div><div class="kc-sub" id="k-long-wr"></div></div>
+<div class="kc"><div class="kc-lbl">Trades SHORT</div><div class="kc-val" id="k-short" style="color:var(--red)">—</div><div class="kc-sub" id="k-short-wr"></div></div>
+<div class="kc"><div class="kc-lbl">Série gagnante</div><div class="kc-val" id="k-streak" style="color:var(--acc)">—</div></div>
+
+</div>
+
+<!-- Graphiques -->
+<div class="charts-grid">
+<div class="chart-card wide">
+<div class="chart-title">📈 Courbe P&L Cumulée <span id="pnl-final"></span></div>
+<div class="chart-container tall"><canvas id="chart-cum"></canvas></div>
+</div>
+<div class="chart-card">
+<div class="chart-title">📅 P&L par Mois</div>
+<div class="chart-container"><canvas id="chart-month"></canvas></div>
+</div>
+<div class="chart-card">
+<div class="chart-title">🎯 Win / Loss <span id="wl-detail"></span></div>
+<div class="chart-container"><canvas id="chart-wl"></canvas></div>
+</div>
+</div>
+
+<!-- Tables analyse -->
+<div class="analysis-grid">
+<div class="an-card">
+<div class="an-title">🏦 Par Actif</div>
+<table class="an-table">
+<thead><tr><th>Actif</th><th>Trades</th><th>P&L ($)</th><th>Win Rate</th></tr></thead>
+<tbody id="an-symbol"></tbody>
+</table>
+</div>
+<div class="an-card">
+<div class="an-title">📆 Par Jour de Semaine</div>
+<table class="an-table">
+<thead><tr><th>Jour</th><th>Trades</th><th>P&L ($)</th><th>Win Rate</th></tr></thead>
+<tbody id="an-dow"></tbody>
+</table>
+</div>
+<div class="an-card">
+<div class="an-title">📊 Par Actif — Graphique</div>
+<div class="chart-container tall"><canvas id="chart-sym"></canvas></div>
+</div>
+<div class="an-card">
+<div class="an-title">⏱️ Durée des Trades</div>
+<table class="an-table">
+<thead><tr><th>Durée</th><th>Trades</th><th>P&L moyen</th><th>Win Rate</th></tr></thead>
+<tbody id="an-duration"></tbody>
+</table>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<script>
+// ─── ÉTAT ────────────────────────────────────────────────────────────────
+let allTrades = [];
+let tblFilter = 'all';
+let period = 'month';
+let customStart = null, customEnd = null;
+let charts = {};
+const BE_THRESHOLD = 30;
+
+Chart.defaults.color = '#787890';
+Chart.defaults.borderColor = '#35364A';
+
+// ─── UTILITAIRES DATE ─────────────────────────────────────────────────────
+function parseDate(s) {
+if (!s) return null;
+s = s.trim();
+// DD/MM/YYYY HH:MM:SS (Hyperliquid)
+let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]);
+// M/D/YYYY H:MM:SS AM/PM (ICMarkets)
+m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})\s+(AM|PM)$/i);
+if (m) {
+let h = +m[4];
+if (/pm/i.test(m[7]) && h !== 12) h += 12;
+if (/am/i.test(m[7]) && h === 12) h = 0;
+return new Date(+m[3], +m[1]-1, +m[2], h, +m[5], +m[6]);
+}
+return null;
+}
+function fmtDate(d) {
+if (!d) return '—';
+return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+function sod(d) { const r=new Date(d); r.setHours(0,0,0,0); return r; }
+function eod(d) { const r=new Date(d); r.setHours(23,59,59,999); return r; }
+function sow(d) { const r=sod(d), day=r.getDay(); r.setDate(r.getDate()-(day===0?6:day-1)); return r; }
+function eow(d) { const r=sow(d); r.setDate(r.getDate()+6); return eod(r); }
+function som(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function eom(d) { return new Date(d.getFullYear(), d.getMonth()+1, 0, 23,59,59,999); }
+function soq(d) { const m=Math.floor(d.getMonth()/3)*3; return new Date(d.getFullYear(), m, 1); }
+function eoq(d) { const m=Math.floor(d.getMonth()/3)*3+3; return new Date(d.getFullYear(), m, 0, 23,59,59,999); }
+
+function getRange() {
+const now = new Date();
+switch(period) {
+case 'today': return [sod(now), eod(now)];
+case 'yesterday': { const y = new Date(now); y.setDate(y.getDate()-1); return [sod(y), eod(y)]; }
+case 'week': return [sow(now), eow(now)];
+case 'lastweek': { const s = sow(now); s.setDate(s.getDate()-7); return [s, eod(new Date(s.getFullYear(), s.getMonth(), s.getDate()+6))]; }
+case 'month': return [som(now), eom(now)];
+case 'lastmonth': { const s = new Date(now.getFullYear(), now.getMonth()-1, 1); return [s, eom(s)]; }
+case 'quarter': return [soq(now), eoq(now)];
+case 'custom': return [customStart, customEnd];
+default: return [new Date(2000,0,1), new Date(2099,11,31)];
+}
+}
+
+function isBE(t) { return Math.abs(t.pnl) <= BE_THRESHOLD; }
+
+function updateSymbolFilter() {
+const sel = document.getElementById('f-symbol');
+if (!sel) return;
+const cur = sel.value;
+const syms = [...new Set(allTrades.map(t=>t.symbol))].sort();
+sel.innerHTML = '<option value="all">Tous</option>' + syms.map(s=>`<option value="${s}"${s===cur?' selected':''}>${s}</option>`).join('');
+}
+
+function filtered() {
+const [s, e] = getRange();
+const platform = document.getElementById('f-platform')?.value || 'all';
+const symbol = document.getElementById('f-symbol')?.value || 'all';
+const direction = document.getElementById('f-direction')?.value || 'all';
+const result = document.getElementById('f-result')?.value || 'all';
+
+return allTrades.filter(t => {
+if (s && e && t.closeDate && (t.closeDate < s || t.closeDate > e)) return false;
+if (platform !== 'all' && t.source !== platform) return false;
+if (symbol !== 'all' && t.symbol !== symbol) return false;
+if (direction !== 'all' && t.direction !== direction) return false;
+if (result === 'win' && !(t.pnl > BE_THRESHOLD)) return false;
+if (result === 'loss' && !(t.pnl < -BE_THRESHOLD)) return false;
+return true;
+});
+}
+
+// ─── FORMAT ────────────────────────────────────────────────────────────────
+function fmtMoney(v, forceSign=false) {
+const abs = Math.abs(v).toFixed(2);
+const sign = v < 0 ? '−$' : (forceSign && v > 0 ? '+$' : '$');
+return sign + parseFloat(abs).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtPct(v) { return (v*100).toFixed(1)+'%'; }
+function fmtNum(v, d=2) { return parseFloat(v).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:4}); }
+function colorPnl(v) { return v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--gray)'; }
+
+// ─── DRAG & DROP ────────────────────────────────────────────────────────────
+function dzOver(e,id) { e.preventDefault(); document.getElementById('dz-'+id).classList.add('over'); }
+function dzOut(id) { document.getElementById('dz-'+id).classList.remove('over'); }
+function dzDrop(e,id) { e.preventDefault(); dzOut(id); const f=e.dataTransfer.files[0]; if(f) processFile(f,id); }
+function onFile(e,id) { const f=e.target.files[0]; if(f) processFile(f,id); }
+
+function setDzStatus(id, msg, ok) {
+const dz = document.getElementById('dz-'+id);
+const st = document.getElementById('st-'+id);
+dz.classList.remove('ok','err');
+if (ok === true) { dz.classList.add('ok'); st.innerHTML = `<div class="dz-status">${msg}</div>`; }
+if (ok === false) { dz.classList.add('err'); st.innerHTML = `<div class="dz-status">${msg}</div>`; }
+if (ok === null) { st.innerHTML = ''; }
+}
+
+function processFile(file, id) {
+if (id === 'hl') {
+Papa.parse(file, {
+header: true, skipEmptyLines: true,
+complete: res => {
+try {
+const t = parseHL(res.data);
+mergeSource(t, 'hl');
+setDzStatus('hl', `✓ ${t.length} trades importés`, true);
+} catch(e) { setDzStatus('hl', '✗ Format invalide', false); console.error(e); }
+}
+});
+} else {
+const r = new FileReader();
+r.onload = e => {
+try {
+const wb = XLSX.read(e.target.result, {type:'array'});
+const ws = wb.Sheets[wb.SheetNames[0]];
+const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+const t = parseIC(aoa);
+mergeSource(t, 'ic');
+setDzStatus('ic', `✓ ${t.length} trades importés`, true);
+} catch(err) { setDzStatus('ic', '✗ Format invalide', false); console.error(err); }
+};
+r.readAsArrayBuffer(file);
+}
+}
+
+// ─── PARSEURS ──────────────────────────────────────────────────────────────
+function parseHL(rows) {
+const positions = {}; // clé → { opens: [], feePerUnit, totalSz }
+const trades = [];
+
+for (const row of rows) {
+const coin = (row.coin||'').trim();
+const dir = (row.dir||'').trim();
+const fee = +row.fee || 0;
+const pnl = +row.closedPnl || 0;
+const sz = +row.sz || 0;
+const px = +row.px || 0;
+const dt = parseDate(row.time);
+
+// Trades spot (Buy/Sell sur paire ex: HYPE/USDC)
+if (coin.includes('/')) {
+if (dir === 'Buy' || dir === 'Sell') {
+trades.push({
+source:'hl', openDate: dt, closeDate: dt, symbol: coin,
+direction: dir === 'Buy' ? 'LONG' : 'SHORT',
+entry: px, exit: px, qty: sz, pnl: pnl
+});
+}
+continue;
+}
+
+const isLong = dir.includes('Long');
+const key = coin + (isLong ? '_L' : '_S');
+
+if (dir.startsWith('Open')) {
+const pos = positions[key];
+if (!pos || pos.totalSz < 1e-6) {
+positions[key] = { opens: [{ dt, px, sz }], totalSz: sz };
+} else {
+pos.totalSz += sz;
+pos.opens.push({ dt, px, sz });
+}
+} else if (dir.startsWith('Close')) {
+const pos = positions[key] || null;
+const netPnl = pnl; // closedPnl HL = exactement le PnL affiché sur HL
+const firstOpen = pos && pos.opens.length ? pos.opens[0] : null;
+
+trades.push({
+source:'hl',
+openDate: firstOpen ? firstOpen.dt : dt,
+closeDate: dt,
+symbol: coin,
+direction: isLong ? 'LONG' : 'SHORT',
+entry: firstOpen ? firstOpen.px : null,
+exit: px, qty: sz, pnl: netPnl
+});
+
+if (pos) {
+pos.totalSz = Math.max(0, pos.totalSz - sz);
+if (pos.totalSz < 1e-6) positions[key] = null;
+}
+}
+}
+return trades;
+}
+
+function parseIC(aoa) {
+let hi = -1;
+for (let i=0;i<aoa.length;i++) { if (String(aoa[i][0]).trim()==='Symbol'){hi=i;break;} }
+if (hi<0) throw new Error('Header Symbol introuvable');
+const rows = aoa.slice(hi+1).filter(r=>r[0]&&String(r[0]).trim());
+const pos = {};
+for (const r of rows) {
+const pid = String(r[2]||'').trim(), tx = String(r[5]||'');
+pos[pid] = pos[pid] || {};
+if (tx.includes('In')) pos[pid].in = r;
+if (tx.includes('Out')) pos[pid].out = r;
+}
+const trades = [];
+for (const [, p] of Object.entries(pos)) {
+if (!p.in || !p.out) continue;
+const dir = String(p.in[5]).includes('Buy') ? 'LONG' : 'SHORT';
+trades.push({
+source:'ic',
+openDate: parseDate(String(p.in[4])),
+closeDate: parseDate(String(p.out[4])),
+symbol: String(p.in[0]).trim(),
+direction: dir,
+entry: parseFloat(p.in[7])||null,
+exit: parseFloat(p.out[7])||null,
+qty: parseFloat(p.in[6])||null,
+pnl: parseFloat(p.out[8])||0
+});
+}
+trades.sort((a,b) => (a.openDate||0)-(b.openDate||0));
+return trades;
+}
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+function mergeSource(newTrades, src) {
+allTrades = allTrades.filter(t => t.source !== src).concat(newTrades);
+allTrades.sort((a,b) => (a.openDate||0)-(b.openDate||0));
+updateSymbolFilter();
+refresh();
+}
+
+function clearAll() {
+allTrades = [];
+['hl','ic'].forEach(id => setDzStatus(id, null, null));
+refresh();
+}
+
+function refresh() {
+updateSidebar();
+renderTrades();
+renderDashboard();
+document.getElementById('btn-exp').disabled = allTrades.length === 0;
+}
+
+// ─── SIDEBAR MINI KPIs ─────────────────────────────────────────────────────
+function updateSidebar() {
+const t = allTrades, n = t.length;
+const wins = t.filter(x=>x.pnl>0).length;
+const pnl = t.reduce((s,x)=>s+x.pnl,0);
+const wt = t.filter(x=>x.pnl>0);
+const avg = wt.length ? wt.reduce((s,x)=>s+x.pnl,0)/wt.length : 0;
+document.getElementById('m-total').textContent = n;
+document.getElementById('m-wr').textContent = n ? fmtPct(wins/n) : '—';
+const pe = document.getElementById('m-pnl');
+pe.textContent = fmtMoney(pnl, true);
+pe.style.color = colorPnl(pnl);
+document.getElementById('m-avg').textContent = n ? fmtMoney(avg) : '$0';
+document.getElementById('tb-count').textContent = n;
+}
+
+// ─── TRADES TABLE ──────────────────────────────────────────────────────────
+let sortCol = 'closeDate';
+let sortDir = -1; // -1 = desc, 1 = asc
+
+function sortBy(col) {
+if (sortCol === col) { sortDir *= -1; }
+else { sortCol = col; sortDir = col === 'pnl' ? -1 : 1; }
+renderTrades();
+}
+
+function getSortVal(t, col) {
+switch(col) {
+case 'source': return t.source;
+case 'openDate': return t.openDate ? t.openDate.getTime() : 0;
+case 'closeDate': return t.closeDate ? t.closeDate.getTime() : 0;
+case 'symbol': return t.symbol;
+case 'direction': return t.direction;
+case 'entry': return t.entry ?? -Infinity;
+case 'exit': return t.exit ?? -Infinity;
+case 'qty': return t.qty ?? 0;
+case 'pnl': return t.pnl;
+case 'result': return isBE(t) ? 0 : t.pnl > BE_THRESHOLD ? 1 : -1;
+default: return 0;
+}
+}
+
+function setTblFilter(f, btn) {
+tblFilter = f;
+document.querySelectorAll('.filt-btn').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+renderTrades();
+}
+
+function renderTrades() {
+const map = { all:()=>true, hl:t=>t.source==='hl', ic:t=>t.source==='ic',
+win:t=>t.pnl>BE_THRESHOLD, loss:t=>t.pnl<-BE_THRESHOLD, long:t=>t.direction==='LONG', short:t=>t.direction==='SHORT' };
+let show = allTrades.filter(map[tblFilter]||map.all);
+
+// Tri
+show = [...show].sort((a,b) => {
+const av = getSortVal(a, sortCol), bv = getSortVal(b, sortCol);
+if (av < bv) return -sortDir;
+if (av > bv) return sortDir;
+return 0;
+});
+
+// Mettre à jour les indicateurs dans le header
+document.querySelectorAll('thead th.sortable').forEach(th => {
+th.classList.remove('sort-asc','sort-desc');
+});
+const cols = ['source','openDate','closeDate','symbol','direction','entry','exit','qty','pnl','result'];
+const idx = cols.indexOf(sortCol);
+if (idx >= 0) {
+const ths = document.querySelectorAll('thead th.sortable');
+if (ths[idx]) ths[idx].classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+}
+
+const empty = document.getElementById('tbl-empty');
+const tbl = document.getElementById('trades-tbl');
+const body = document.getElementById('trades-body');
+if (!show.length) { empty.style.display='block'; tbl.style.display='none'; return; }
+empty.style.display='none'; tbl.style.display='table';
+body.innerHTML = show.map((t,i) => {
+const be = isBE(t);
+const w = t.pnl > BE_THRESHOLD;
+const src = t.source==='hl'
+? '<span class="tag src-hl">⚡ Hyperliquid</span>'
+: '<span class="tag src-ic">📈 ICMarkets</span>';
+const pnlColor = be ? 'var(--blue)' : colorPnl(t.pnl);
+const resultTag = be
+? '<span class="tag be">🔵 BE</span>'
+: `<span class="tag ${w?'win':'loss'}">${w?'✅ Win':'❌ Loss'}</span>`;
+return `<tr>
+<td style="color:var(--gray)">${i+1}</td>
+<td>${src}</td>
+<td style="color:var(--gray)">${fmtDate(t.openDate)}</td>
+<td style="color:var(--gray)">${fmtDate(t.closeDate)}</td>
+<td><strong>${t.symbol}</strong></td>
+<td><span class="tag ${t.direction==='LONG'?'long':'short'}">${t.direction}</span></td>
+<td>${t.entry!=null?fmtNum(t.entry):'—'}</td>
+<td>${t.exit!=null?fmtNum(t.exit):'—'}</td>
+<td style="color:var(--gray)">${t.qty!=null?fmtNum(t.qty):'—'}</td>
+<td style="font-weight:700;color:${pnlColor}">${t.pnl>=0?'+':''}${fmtMoney(t.pnl)}</td>
+<td>${resultTag}</td>
+</tr>`;
+}).join('');
+}
+
+// ─── DASHBOARD ─────────────────────────────────────────────────────────────
+function switchTab(name, el) {
+document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+el.classList.add('active');
+document.getElementById('tab-'+name).classList.add('active');
+if (name === 'dashboard') renderDashboard();
+}
+
+function setPeriod(p, btn) {
+period = p;
+document.querySelectorAll('.pb').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+document.getElementById('custom-dates').style.display = p==='custom' ? 'flex' : 'none';
+if (p !== 'custom') renderDashboard();
+}
+
+function applyCustom() {
+const s = document.getElementById('dt-start').value;
+const e = document.getElementById('dt-end').value;
+if (s && e) {
+customStart = new Date(s+'T00:00:00');
+customEnd = new Date(e+'T23:59:59');
+renderDashboard();
+}
+}
+
+function renderDashboard() {
+const T = filtered();
+if (!T.length) {
+['k-total','k-wr','k-pnl','k-pf','k-exp','k-avg-w','k-avg-l','k-best','k-worst','k-long','k-short','k-streak']
+.forEach(id => { const el=document.getElementById(id); if(el) el.textContent='—'; });
+destroyCharts();
+return;
+}
+
+// Séparer BE des vrais trades
+const beList = T.filter(t => isBE(t));
+const actives = T.filter(t => !isBE(t));
+
+const n = actives.length;
+const wins = actives.filter(t=>t.pnl>0);
+const losses= actives.filter(t=>t.pnl<0);
+const totalPnl = T.reduce((s,t)=>s+t.pnl, 0);
+const sumWin = wins.reduce((s,t)=>s+t.pnl, 0);
+const sumLoss = losses.reduce((s,t)=>s+t.pnl, 0);
+const wr = n ? wins.length / n : 0;
+const pf = sumLoss !== 0 ? sumWin / Math.abs(sumLoss) : Infinity;
+const avgW = wins.length ? sumWin/wins.length : 0;
+const avgL = losses.length ? sumLoss/losses.length : 0;
+const exp = n ? wr*avgW + (1-wr)*avgL : 0;
+const best = actives.length ? Math.max(...actives.map(t=>t.pnl)) : 0;
+const worst = actives.length ? Math.min(...actives.map(t=>t.pnl)) : 0;
+const longs = actives.filter(t=>t.direction==='LONG');
+const shorts= actives.filter(t=>t.direction==='SHORT');
+const lwins = longs.filter(t=>t.pnl>0).length;
+const swins = shorts.filter(t=>t.pnl>0).length;
+
+// Streak (hors BE)
+let maxStreak=0, cur=0;
+for (const t of actives) { if(t.pnl>0){cur++;maxStreak=Math.max(maxStreak,cur);}else{cur=0;} }
+
+// KPIs
+set('k-total', T.length, 'var(--blue)');
+set('k-wr', n ? fmtPct(wr) : '—', wr>=0.5?'var(--green)':'var(--red)');
+setEl('k-pnl', fmtMoney(totalPnl, true), colorPnl(totalPnl));
+set('k-pf', isFinite(pf)?pf.toFixed(2)+'x':'∞', pf>=1?'var(--acc)':'var(--red)');
+setEl('k-exp', n ? fmtMoney(exp, true) : '—', colorPnl(exp));
+set('k-avg-w', avgW?fmtMoney(avgW):'—', 'var(--green)');
+setEl('k-avg-l', avgL?fmtMoney(avgL):'—', 'var(--red)');
+set('k-best', actives.length?fmtMoney(best):'—', 'var(--green)');
+setEl('k-worst', actives.length?fmtMoney(worst):'—', 'var(--red)');
+set('k-long', longs.length, 'var(--green)');
+setElSub('k-long','k-long-wr', longs.length?`Win: ${fmtPct(lwins/longs.length)}`:'');
+set('k-short', shorts.length, 'var(--red)');
+setElSub('k-short','k-short-wr', shorts.length?`Win: ${fmtPct(swins/shorts.length)}`:'');
+set('k-streak', maxStreak, 'var(--acc)');
+
+document.getElementById('pnl-final').textContent =
+`→ ${fmtMoney(totalPnl,true)} sur ${T.length} trades`;
+
+buildCharts(T, n, wins, losses, totalPnl);
+buildAnalysisTables(T);
+}
+
+function set(id, val, color) {
+const el = document.getElementById(id);
+if (!el) return;
+el.textContent = val;
+if (color) el.style.color = color;
+}
+function setEl(id, val, color) { set(id, val, color); }
+function setElSub(mainId, subId, val) {
+const el = document.getElementById(subId);
+if (el) el.textContent = val;
+}
+
+// ─── GRAPHIQUES ────────────────────────────────────────────────────────────
+function destroyCharts() {
+Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+charts = {};
+}
+
+const CHART_OPTS = {
+responsive: true, maintainAspectRatio: false,
+plugins: { legend: { labels: { color: '#EDEDF5', font: { size: 11 } } } },
+scales: {
+x: { grid: { color: '#35364A' }, ticks: { color: '#787890', font:{size:10} } },
+y: { grid: { color: '#35364A' }, ticks: { color: '#787890', font:{size:10} } }
+}
+};
+const PIE_OPTS = {
+responsive: true, maintainAspectRatio: false,
+plugins: { legend: { position: 'bottom', labels: { color: '#EDEDF5', font:{size:11}, padding:14 } } }
+};
+
+function buildCharts(T, n, wins, losses, totalPnl) {
+destroyCharts();
+
+// 1. Courbe P&L cumulée
+const sorted = [...T].sort((a,b)=>(a.closeDate||0)-(b.closeDate||0));
+let cum = 0;
+const cumData = sorted.map(t => { cum += t.pnl; return cum; });
+const cumLabels = sorted.map((t,i) => t.closeDate ? t.closeDate.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : `#${i+1}`);
+const cumColors = cumData.map(v => v >= 0 ? 'rgba(77,207,133,0.7)' : 'rgba(238,106,106,0.7)');
+charts.cum = new Chart(document.getElementById('chart-cum'), {
+type: 'line',
+data: {
+labels: cumLabels,
+datasets: [{
+label: 'P&L Cumulé ($)',
+data: cumData,
+borderColor: '#9580E4',
+backgroundColor: ctx => {
+const g = ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);
+g.addColorStop(0,'rgba(149,128,228,0.25)'); g.addColorStop(1,'rgba(149,128,228,0.01)');
+return g;
+},
+fill: true, tension: 0.35, pointRadius: n > 50 ? 0 : 3,
+pointBackgroundColor: cumColors, pointBorderColor: 'transparent',
+borderWidth: 2
+}]
+},
+options: { ...CHART_OPTS,
+scales: { ...CHART_OPTS.scales,
+y: { ...CHART_OPTS.scales.y,
+ticks: { ...CHART_OPTS.scales.y.ticks,
+callback: v => '$'+v.toLocaleString('fr-FR') } } }
+}
+});
+
+// 2. P&L par Mois
+const months = {};
+for (const t of T) {
+if (!t.closeDate) continue;
+const key = `${t.closeDate.getFullYear()}-${String(t.closeDate.getMonth()+1).padStart(2,'0')}`;
+months[key] = (months[key]||0) + t.pnl;
+}
+const mKeys = Object.keys(months).sort();
+const mVals = mKeys.map(k=>months[k]);
+charts.month = new Chart(document.getElementById('chart-month'), {
+type: 'bar',
+data: {
+labels: mKeys.map(k => { const [y,m]=k.split('-'); return ['Jan','Fév','Mar','Avr','Mai','Jui','Jul','Aoû','Sep','Oct','Nov','Déc'][+m-1]+' '+y.slice(2); }),
+datasets: [{
+label: 'P&L ($)',
+data: mVals,
+backgroundColor: mVals.map(v=>v>=0?'rgba(77,207,133,0.75)':'rgba(238,106,106,0.75)'),
+borderColor: mVals.map(v=>v>=0?'#4DCF85':'#EE6A6A'),
+borderWidth: 1, borderRadius: 4
+}]
+},
+options: { ...CHART_OPTS,
+plugins: { legend: { display: false } },
+scales: { ...CHART_OPTS.scales,
+y: { ...CHART_OPTS.scales.y,
+ticks: { callback: v=>'$'+v.toLocaleString('fr-FR') } } }
+}
+});
+
+// 3. Win / Loss donut
+document.getElementById('wl-detail').textContent = `${wins.length}W / ${losses.length}L`;
+charts.wl = new Chart(document.getElementById('chart-wl'), {
+type: 'doughnut',
+data: {
+labels: [`✅ Wins (${wins.length})`, `❌ Losses (${losses.length})`],
+datasets: [{
+data: [wins.length, losses.length],
+backgroundColor: ['rgba(77,207,133,0.8)','rgba(238,106,106,0.8)'],
+borderColor: ['#4DCF85','#EE6A6A'],
+borderWidth: 2
+}]
+},
+options: { ...PIE_OPTS,
+cutout: '65%',
+plugins: { ...PIE_OPTS.plugins,
+tooltip: { callbacks: { label: ctx => {
+const v = ctx.parsed, tot = ctx.dataset.data.reduce((a,b)=>a+b,0);
+return ` ${v} trades (${(v/tot*100).toFixed(1)}%)`;
+}}}
+}
+}
+});
+
+// 4. P&L par Actif
+buildSymbolChart(T);
+}
+
+function buildSymbolChart(T) {
+const symMap = {};
+for (const t of T) { symMap[t.symbol] = (symMap[t.symbol]||0)+t.pnl; }
+const syms = Object.entries(symMap).sort((a,b)=>b[1]-a[1]);
+const labels = syms.map(([s])=>s);
+const vals = syms.map(([,v])=>v);
+
+if (charts.sym) { try { charts.sym.destroy(); } catch(e){} }
+charts.sym = new Chart(document.getElementById('chart-sym'), {
+type: 'bar',
+data: {
+labels,
+datasets: [{
+label: 'P&L ($)',
+data: vals,
+backgroundColor: vals.map(v=>v>=0?'rgba(77,207,133,0.75)':'rgba(238,106,106,0.75)'),
+borderColor: vals.map(v=>v>=0?'#4DCF85':'#EE6A6A'),
+borderWidth:1, borderRadius:4
+}]
+},
+options: { ...CHART_OPTS,
+indexAxis: 'y',
+plugins: { legend: { display:false } },
+scales: { ...CHART_OPTS.scales,
+x: { ...CHART_OPTS.scales.x,
+ticks: { callback: v=>'$'+v.toLocaleString('fr-FR') } },
+y: { grid: { display:false }, ticks: { color:'#EDEDF5', font:{size:10} } }
+}
+}
+});
+}
+
+// ─── TABLES D'ANALYSE ──────────────────────────────────────────────────────
+function buildAnalysisTables(T) {
+// Séparer BE pour l'analyse
+const actives = T.filter(t => !isBE(t));
+const beList = T.filter(t => isBE(t));
+
+// Par actif (hors BE)
+const symData = {};
+for (const t of actives) {
+const s = t.symbol;
+symData[s] = symData[s] || {nb:0, pnl:0, wins:0};
+symData[s].nb++; symData[s].pnl+=t.pnl;
+if (t.pnl>0) symData[s].wins++;
+}
+const syms = Object.entries(symData).sort((a,b)=>b[1].pnl-a[1].pnl);
+document.getElementById('an-symbol').innerHTML = syms.map(([s,d]) => {
+const wr = d.nb ? d.wins/d.nb : 0;
+const pc = colorPnl(d.pnl);
+return `<tr>
+<td><strong>${s}</strong></td>
+<td style="color:var(--blue)">${d.nb}</td>
+<td style="color:${pc};font-weight:600">${fmtMoney(d.pnl,true)}</td>
+<td style="color:${wr>=0.5?'var(--green)':'var(--red)'}">${d.nb?fmtPct(wr):'—'}</td>
+</tr>`;
+}).join('') || `<tr><td colspan="4" class="no-data">Aucune donnée</td></tr>`;
+
+// Par jour de semaine (hors BE)
+const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+const dowData = DAYS.map(()=>({nb:0,pnl:0,wins:0}));
+for (const t of actives) {
+if (!t.closeDate) continue;
+const idx = (t.closeDate.getDay()+6)%7;
+dowData[idx].nb++; dowData[idx].pnl+=t.pnl;
+if (t.pnl>0) dowData[idx].wins++;
+}
+document.getElementById('an-dow').innerHTML = DAYS.map((day,i) => {
+const d = dowData[i];
+if (!d.nb) return `<tr><td>${day}</td><td style="color:var(--lgray)">—</td><td style="color:var(--lgray)">—</td><td style="color:var(--lgray)">—</td></tr>`;
+const wr = d.wins/d.nb;
+return `<tr>
+<td><strong>${day}</strong></td>
+<td style="color:var(--blue)">${d.nb}</td>
+<td style="color:${colorPnl(d.pnl)};font-weight:600">${fmtMoney(d.pnl,true)}</td>
+<td style="color:${wr>=0.5?'var(--green)':'var(--red)'}">${fmtPct(wr)}</td>
+</tr>`;
+}).join('');
+
+// Par durée (hors BE)
+const DURATIONS = [
+['< 1h', t => diffH(t) < 1],
+['1h – 4h', t => diffH(t) >= 1 && diffH(t) < 4],
+['4h – 1j', t => diffH(t) >= 4 && diffH(t) < 24],
+['1j – 1s', t => diffH(t) >= 24 && diffH(t) < 168],
+['> 1 sem', t => diffH(t) >= 168],
+];
+function diffH(t) {
+if (!t.openDate || !t.closeDate) return 0;
+return (t.closeDate - t.openDate) / 3600000;
+}
+document.getElementById('an-duration').innerHTML = DURATIONS.map(([lbl, fn]) => {
+const g = actives.filter(fn);
+if (!g.length) return `<tr><td>${lbl}</td><td style="color:var(--lgray)">—</td><td style="color:var(--lgray)">—</td><td style="color:var(--lgray)">—</td></tr>`;
+const pnl = g.reduce((s,t)=>s+t.pnl,0)/g.length;
+const wr = g.filter(t=>t.pnl>0).length/g.length;
+return `<tr>
+<td><strong>${lbl}</strong></td>
+<td style="color:var(--blue)">${g.length}</td>
+<td style="color:${colorPnl(pnl)};font-weight:600">${fmtMoney(pnl,true)}</td>
+<td style="color:${wr>=0.5?'var(--green)':'var(--red)'}">${fmtPct(wr)}</td>
+</tr>`;
+}).join('');
+}
+
+// ─── EXPORT XLSX ────────────────────────────────────────────────────────────
+function exportXLSX() {
+if (!allTrades.length) return;
+const rows = [['Date Entrée','Date Sortie','Actif','Direction','Entrée','Sortie','Quantité','P&L ($)','Résultat','Source']];
+for (const t of allTrades) {
+rows.push([
+t.openDate ? t.openDate.toLocaleString('fr-FR') : '',
+t.closeDate ? t.closeDate.toLocaleString('fr-FR') : '',
+t.symbol, t.direction,
+t.entry!=null ? t.entry : '',
+t.exit!=null ? t.exit : '',
+t.qty!=null ? t.qty : '',
+t.pnl,
+t.pnl > 0 ? 'Win' : 'Loss',
+t.source === 'hl' ? 'Hyperliquid' : 'ICMarkets'
+]);
+}
+const ws = XLSX.utils.aoa_to_sheet(rows);
+ws['!cols'] = [16,16,12,10,11,11,10,12,10,12].map(w=>({wch:w}));
+const wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, 'Trades');
+XLSX.writeFile(wb, `trades_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+</script>
+</body>
+</html>
+
