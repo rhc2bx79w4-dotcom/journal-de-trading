@@ -416,6 +416,22 @@ let period = 'month';
 let customStart = null, customEnd = null;
 let charts = {};
 const BE_THRESHOLD = 30;
+let eurUsdRate = 1.10; // fallback
+
+async function fetchEurUsd() {
+try {
+const r = await fetch('https://api.exchangerate-api.com/v4/latest/EUR');
+const d = await r.json();
+if (d.rates?.USD) eurUsdRate = d.rates.USD;
+} catch(e) { console.warn('EUR/USD fetch failed, using', eurUsdRate); }
+}
+fetchEurUsd();
+
+function toUsd(trade) {
+if (trade.currency === 'EUR') return trade.pnl * eurUsdRate;
+return trade.pnl;
+}
+function currSym(trade) { return trade.currency === 'EUR' ? '€' : '$'; }
 
 Chart.defaults.color = '#787890';
 Chart.defaults.borderColor = '#35364A';
@@ -497,9 +513,9 @@ return true;
 }
 
 // ─── FORMAT ────────────────────────────────────────────────────────────────
-function fmtMoney(v, forceSign=false) {
+function fmtMoney(v, forceSign=false, sym='$') {
 const abs = Math.abs(v).toFixed(2);
-const sign = v < 0 ? '−$' : (forceSign && v > 0 ? '+$' : '$');
+const sign = v < 0 ? '−'+sym : (forceSign && v > 0 ? '+'+sym : sym);
 return sign + parseFloat(abs).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 function fmtPct(v) { return (v*100).toFixed(1)+'%'; }
@@ -606,7 +622,8 @@ direction: isShort ? 'SHORT' : 'LONG',
 entry: pos ? pos.vwap : null,
 exit: px, qty: sz, fee: totalFee,
 volume: sz * px,
-pnl: netPnl
+pnl: netPnl,
+currency: 'USD'
 });
 
 if (pos) {
@@ -652,7 +669,8 @@ direction: dir,
 entry: parseFloat(p.in[7])||null,
 exit: parseFloat(p.out[7])||null,
 qty: parseFloat(p.in[6])||null,
-pnl: parseFloat(p.out[8])||0
+pnl: parseFloat(p.out[8])||0,
+currency: 'EUR'
 });
 }
 trades.sort((a,b) => (a.openDate||0)-(b.openDate||0));
@@ -686,9 +704,9 @@ document.getElementById('btn-exp').disabled = allTrades.length === 0;
 function updateSidebar() {
 const t = allTrades, n = t.length;
 const wins = t.filter(x=>x.pnl>0).length;
-const pnl = t.reduce((s,x)=>s+x.pnl,0);
+const pnl = t.reduce((s,x)=>s+toUsd(x),0);
 const wt = t.filter(x=>x.pnl>0);
-const avg = wt.length ? wt.reduce((s,x)=>s+x.pnl,0)/wt.length : 0;
+const avg = wt.length ? wt.reduce((s,x)=>s+toUsd(x),0)/wt.length : 0;
 document.getElementById('m-total').textContent = n;
 document.getElementById('m-wr').textContent = n ? fmtPct(wins/n) : '—';
 const pe = document.getElementById('m-pnl');
@@ -780,7 +798,7 @@ return `<tr>
 <td>${t.entry!=null?fmtNum(t.entry):'—'}</td>
 <td>${t.exit!=null?fmtNum(t.exit):'—'}</td>
 <td style="color:var(--gray)">${t.qty!=null?fmtNum(t.qty):'—'}</td>
-<td style="font-weight:700;color:${pnlColor}">${t.pnl>=0?'+':''}${fmtMoney(t.pnl)}</td>
+<td style="font-weight:700;color:${pnlColor}">${t.pnl>=0?'+':''}${fmtMoney(t.pnl, false, currSym(t))}</td>
 <td>${resultTag}</td>
 </tr>`;
 }).join('');
@@ -830,16 +848,16 @@ const actives = T.filter(t => !isBE(t));
 const n = actives.length;
 const wins = actives.filter(t=>t.pnl>0);
 const losses= actives.filter(t=>t.pnl<0);
-const totalPnl = T.reduce((s,t)=>s+t.pnl, 0);
-const sumWin = wins.reduce((s,t)=>s+t.pnl, 0);
-const sumLoss = losses.reduce((s,t)=>s+t.pnl, 0);
+const totalPnl = T.reduce((s,t)=>s+toUsd(t), 0);
+const sumWin = wins.reduce((s,t)=>s+toUsd(t), 0);
+const sumLoss = losses.reduce((s,t)=>s+toUsd(t), 0);
 const wr = n ? wins.length / n : 0;
 const pf = sumLoss !== 0 ? sumWin / Math.abs(sumLoss) : Infinity;
 const avgW = wins.length ? sumWin/wins.length : 0;
 const avgL = losses.length ? sumLoss/losses.length : 0;
 const exp = n ? wr*avgW + (1-wr)*avgL : 0;
-const best = actives.length ? Math.max(...actives.map(t=>t.pnl)) : 0;
-const worst = actives.length ? Math.min(...actives.map(t=>t.pnl)) : 0;
+const best = actives.length ? Math.max(...actives.map(t=>toUsd(t))) : 0;
+const worst = actives.length ? Math.min(...actives.map(t=>toUsd(t))) : 0;
 const longs = actives.filter(t=>t.direction==='LONG');
 const shorts= actives.filter(t=>t.direction==='SHORT');
 const lwins = longs.filter(t=>t.pnl>0).length;
@@ -888,7 +906,7 @@ set('k-volume', totalVolume ? '$'+Math.round(totalVolume).toLocaleString('fr-FR'
 set('k-fees', totalFees ? fmtMoney(totalFees) : '—', 'var(--red)');
 
 document.getElementById('pnl-final').textContent =
-`→ ${fmtMoney(totalPnl,true)} sur ${T.length} trades`;
+`→ ${fmtMoney(totalPnl,true)} sur ${T.length} trades (1€ = ${eurUsdRate.toFixed(4)}$)`;
 
 buildCharts(T, n, wins, losses, totalPnl);
 buildAnalysisTables(T);
@@ -941,7 +959,7 @@ const resultTag = be
 ? '<span class="tag be">🔵 BE</span>'
 : `<span class="tag ${w?'win':'loss'}">${w?'✅ Win':'❌ Loss'}</span>`;
 return `<tr>
-<td style="font-weight:700;color:${pnlColor}">${t.pnl>=0?'+':''}${fmtMoney(t.pnl)}</td>
+<td style="font-weight:700;color:${pnlColor}">${t.pnl>=0?'+':''}${fmtMoney(t.pnl, false, currSym(t))}</td>
 <td>${resultTag}</td>
 <td style="color:var(--gray)">${i+1}</td>
 <td>${src}</td>
@@ -993,7 +1011,7 @@ destroyCharts();
 // 1. Courbe P&L cumulée
 const sorted = [...T].sort((a,b)=>(a.closeDate||0)-(b.closeDate||0));
 let cum = 0;
-const cumData = sorted.map(t => { cum += t.pnl; return cum; });
+const cumData = sorted.map(t => { cum += toUsd(t); return cum; });
 const cumLabels = sorted.map((t,i) => t.closeDate ? t.closeDate.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'}) : `#${i+1}`);
 const cumColors = cumData.map(v => v >= 0 ? 'rgba(77,207,133,0.7)' : 'rgba(238,106,106,0.7)');
 charts.cum = new Chart(document.getElementById('chart-cum'), {
@@ -1027,7 +1045,7 @@ const months = {};
 for (const t of T) {
 if (!t.closeDate) continue;
 const key = `${t.closeDate.getFullYear()}-${String(t.closeDate.getMonth()+1).padStart(2,'0')}`;
-months[key] = (months[key]||0) + t.pnl;
+months[key] = (months[key]||0) + toUsd(t);
 }
 const mKeys = Object.keys(months).sort();
 const mVals = mKeys.map(k=>months[k]);
@@ -1081,7 +1099,7 @@ buildSymbolChart(T);
 
 function buildSymbolChart(T) {
 const symMap = {};
-for (const t of T) { symMap[t.symbol] = (symMap[t.symbol]||0)+t.pnl; }
+for (const t of T) { symMap[t.symbol] = (symMap[t.symbol]||0)+toUsd(t); }
 const syms = Object.entries(symMap).sort((a,b)=>b[1]-a[1]);
 const labels = syms.map(([s])=>s);
 const vals = syms.map(([,v])=>v);
@@ -1122,7 +1140,7 @@ const symData = {};
 for (const t of actives) {
 const s = t.symbol;
 symData[s] = symData[s] || {nb:0, pnl:0, wins:0};
-symData[s].nb++; symData[s].pnl+=t.pnl;
+symData[s].nb++; symData[s].pnl+=toUsd(t);
 if (t.pnl>0) symData[s].wins++;
 }
 const syms = Object.entries(symData).sort((a,b)=>b[1].pnl-a[1].pnl);
@@ -1143,7 +1161,7 @@ const dowData = DAYS.map(()=>({nb:0,pnl:0,wins:0}));
 for (const t of actives) {
 if (!t.closeDate) continue;
 const idx = (t.closeDate.getDay()+6)%7;
-dowData[idx].nb++; dowData[idx].pnl+=t.pnl;
+dowData[idx].nb++; dowData[idx].pnl+=toUsd(t);
 if (t.pnl>0) dowData[idx].wins++;
 }
 document.getElementById('an-dow').innerHTML = DAYS.map((day,i) => {
@@ -1173,7 +1191,7 @@ return (t.closeDate - t.openDate) / 3600000;
 document.getElementById('an-duration').innerHTML = DURATIONS.map(([lbl, fn]) => {
 const g = actives.filter(fn);
 if (!g.length) return `<tr><td>${lbl}</td><td style="color:var(--lgray)">—</td><td style="color:var(--lgray)">—</td><td style="color:var(--lgray)">—</td></tr>`;
-const pnl = g.reduce((s,t)=>s+t.pnl,0)/g.length;
+const pnl = g.reduce((s,t)=>s+toUsd(t),0)/g.length;
 const wr = g.filter(t=>t.pnl>0).length/g.length;
 return `<tr>
 <td><strong>${lbl}</strong></td>
@@ -1299,7 +1317,8 @@ function parseMT5JSON(data) {
       entry:     d.open_price  || null,
       exit:      d.close_price || null,
       qty:       d.volume      || null,
-      pnl:       d.net_pnl     || 0   // profit + commission + swap
+      pnl:       d.net_pnl     || 0,  // profit + commission + swap
+      currency:  'EUR'
     }));
 }
 
