@@ -132,6 +132,18 @@ td{padding:9px 14px;white-space:nowrap}
 .df-select:focus{border-color:var(--acc)}
 .df-select option{background:var(--bg3)}
 
+/* ── DASH TRADES TABLE ────────────────────────────────────────────────── */
+.dash-trades{background:var(--bg2);border:1px solid var(--dgray);border-radius:var(--r);overflow:hidden;overflow-x:auto;width:100%}
+.dash-trades .dt-header{padding:12px 14px;font-size:11px;font-weight:700;color:var(--acc);background:var(--bg3);border-bottom:1px solid var(--dgray);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between}
+.dash-trades .dt-header .dt-count{font-size:10px;color:var(--gray);font-weight:600;text-transform:none;letter-spacing:0}
+.dash-trades table{width:100%;border-collapse:collapse;font-size:11px}
+.dash-trades thead th{background:var(--bg3);color:var(--gray);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:8px 12px;text-align:left;border-bottom:1px solid var(--dgray);white-space:nowrap}
+.dash-trades tbody tr{border-bottom:1px solid rgba(53,54,74,.4);transition:.1s}
+.dash-trades tbody tr:hover{background:rgba(149,128,228,.04)}
+.dash-trades tbody tr:last-child{border:none}
+.dash-trades td{padding:7px 12px;white-space:nowrap}
+.dash-trades .dt-empty{text-align:center;padding:30px;color:var(--gray);font-size:12px}
+
 /* ── SCROLLBAR ────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:var(--bg2)}
@@ -179,6 +191,18 @@ td{padding:9px 14px;white-space:nowrap}
 <div class="km"><div class="km-v" id="m-pnl">$0</div><div class="km-l">P&L Total</div></div>
 <div class="km"><div class="km-v" id="m-avg" style="color:var(--gray)">$0</div><div class="km-l">Gain Moyen</div></div>
 </div>
+</div>
+
+<div class="sb-section">
+<div class="sb-label">Refresh Auto</div>
+<div style="margin-bottom:8px">
+<div style="font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">Adresse Hyperliquid</div>
+<input type="text" id="hl-address" placeholder="0x..."
+  style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--dgray);background:var(--bg3);color:var(--white);font-size:11px;outline:none;font-family:monospace;box-sizing:border-box"
+  oninput="localStorage.setItem('hl_addr',this.value)">
+</div>
+<button class="btn btn-p" id="btn-refresh" onclick="refreshResults()">🔄 Refresh Results</button>
+<div id="refresh-status" style="font-size:10px;color:var(--gray);line-height:1.7;margin-top:4px"></div>
 </div>
 
 <div class="sb-section">
@@ -244,6 +268,9 @@ td{padding:9px 14px;white-space:nowrap}
 <div class="period-bar">
 <span>Période :</span>
 <button class="pb" onclick="setPeriod('all',this)">Tout</button>
+<button class="pb" onclick="setPeriod('l24h',this)">L24H</button>
+<button class="pb" onclick="setPeriod('l7d',this)">L7D</button>
+<button class="pb" onclick="setPeriod('l30d',this)">L30D</button>
 <button class="pb" onclick="setPeriod('today',this)">Aujourd'hui</button>
 <button class="pb" onclick="setPeriod('yesterday',this)">Hier</button>
 <button class="pb" onclick="setPeriod('week',this)">Cette semaine</button>
@@ -297,9 +324,9 @@ td{padding:9px 14px;white-space:nowrap}
 
 <!-- KPIs -->
 <div class="kpi-grid" id="kpi-grid">
+<div class="kc"><div class="kc-lbl">P&L Total (net)</div><div class="kc-val" id="k-pnl-net">—</div></div>
 <div class="kc"><div class="kc-lbl">Total Trades</div><div class="kc-val" id="k-total" style="color:var(--blue)">—</div></div>
 <div class="kc"><div class="kc-lbl">Win Rate</div><div class="kc-val" id="k-wr" style="color:var(--yellow)">—</div></div>
-<div class="kc"><div class="kc-lbl">P&L Total</div><div class="kc-val" id="k-pnl">—</div></div>
 <div class="kc"><div class="kc-lbl">Profit Factor</div><div class="kc-val" id="k-pf" style="color:var(--acc)">—</div></div>
 <div class="kc"><div class="kc-lbl">Expectancy ($)</div><div class="kc-val" id="k-exp">—</div></div>
 <div class="kc"><div class="kc-lbl">Gain Moyen</div><div class="kc-val" id="k-avg-w" style="color:var(--green)">—</div></div>
@@ -309,6 +336,10 @@ td{padding:9px 14px;white-space:nowrap}
 <div class="kc"><div class="kc-lbl">Trades LONG</div><div class="kc-val" id="k-long" style="color:var(--green)">—</div><div class="kc-sub" id="k-long-wr"></div></div>
 <div class="kc"><div class="kc-lbl">Trades SHORT</div><div class="kc-val" id="k-short" style="color:var(--red)">—</div><div class="kc-sub" id="k-short-wr"></div></div>
 <div class="kc"><div class="kc-lbl">Série gagnante</div><div class="kc-val" id="k-streak" style="color:var(--acc)">—</div></div>
+<div class="kc"><div class="kc-lbl">P&L Trades</div><div class="kc-val" id="k-pnl">—</div></div>
+<div class="kc"><div class="kc-lbl">Funding HL</div><div class="kc-val" id="k-funding" style="color:var(--gray)">—</div></div>
+<div class="kc"><div class="kc-lbl">Frais totaux</div><div class="kc-val" id="k-fees" style="color:var(--red)">—</div></div>
+<div class="kc"><div class="kc-lbl">Volume échangé</div><div class="kc-val" id="k-volume" style="color:var(--gray)">—</div></div>
 
 </div>
 
@@ -356,6 +387,20 @@ td{padding:9px 14px;white-space:nowrap}
 </table>
 </div>
 </div>
+<!-- Trades de la période -->
+<div class="dash-trades">
+<div class="dt-header">
+<span>📋 Trades de la période</span>
+<span class="dt-count" id="dt-count"></span>
+</div>
+<table id="dash-trades-tbl" style="display:none">
+<thead><tr>
+<th class="sortable" onclick="dashSortBy('pnl')">P&L</th><th class="sortable" onclick="dashSortBy('result')">Résultat</th><th>#</th><th class="sortable" onclick="dashSortBy('source')">Source</th><th class="sortable" onclick="dashSortBy('symbol')">Actif</th><th class="sortable" onclick="dashSortBy('direction')">Dir.</th><th class="sortable" onclick="dashSortBy('openDate')">Ouverture</th><th class="sortable" onclick="dashSortBy('closeDate')">Clôture</th><th class="sortable" onclick="dashSortBy('entry')">Entrée</th><th class="sortable" onclick="dashSortBy('exit')">Sortie</th><th class="sortable" onclick="dashSortBy('qty')">Qté</th>
+</tr></thead>
+<tbody id="dash-trades-body"></tbody>
+</table>
+<div class="dt-empty" id="dash-trades-empty">Aucun trade sur cette période</div>
+</div>
 
 </div>
 </div>
@@ -364,6 +409,8 @@ td{padding:9px 14px;white-space:nowrap}
 <script>
 // ─── ÉTAT ────────────────────────────────────────────────────────────────
 let allTrades = [];
+let hlFunding = []; // [{time: ms, usdc: number}]
+let hlAllFees = []; // [{time: ms, fee: number}] — tous les fills (open + close)
 let tblFilter = 'all';
 let period = 'month';
 let customStart = null, customEnd = null;
@@ -406,6 +453,9 @@ function eoq(d) { const m=Math.floor(d.getMonth()/3)*3+3; return new Date(d.getF
 function getRange() {
 const now = new Date();
 switch(period) {
+case 'l24h': { const s = new Date(now); s.setHours(s.getHours()-24); return [s, now]; }
+case 'l7d': { const s = new Date(now); s.setDate(s.getDate()-7); return [s, now]; }
+case 'l30d': { const s = new Date(now); s.setDate(s.getDate()-30); return [s, now]; }
 case 'today': return [sod(now), eod(now)];
 case 'yesterday': { const y = new Date(now); y.setDate(y.getDate()-1); return [sod(y), eod(y)]; }
 case 'week': return [sow(now), eow(now)];
@@ -500,64 +550,81 @@ r.readAsArrayBuffer(file);
 }
 
 // ─── PARSEURS ──────────────────────────────────────────────────────────────
-function parseHL(rows) {
-const positions = {}; // clé → { opens: [], feePerUnit, totalSz }
+// Logique commune CSV + API : closedPnl - frais (open au prorata + close)
+function parseHLData(fills, dtFn) {
+const positions = {};
 const trades = [];
+const allFees = [];
 
-for (const row of rows) {
-const coin = (row.coin||'').trim();
-const dir = (row.dir||'').trim();
-const fee = +row.fee || 0;
-const pnl = +row.closedPnl || 0;
-const sz = +row.sz || 0;
-const px = +row.px || 0;
-const dt = parseDate(row.time);
+for (const f of fills) {
+const coin = (f.coin||'').trim();
+const dir  = (f.dir||'').trim();
+const fee  = parseFloat(f.fee)       || 0;
+const pnl  = parseFloat(f.closedPnl) || 0;
+const sz   = parseFloat(f.sz)        || 0;
+const px   = parseFloat(f.px)        || 0;
+const dt   = dtFn(f);
+const ts   = dt ? dt.getTime() : 0;
 
-// Trades spot (Buy/Sell sur paire ex: HYPE/USDC)
-if (coin.includes('/')) {
-if (dir === 'Buy' || dir === 'Sell') {
-trades.push({
-source:'hl', openDate: dt, closeDate: dt, symbol: coin,
-direction: dir === 'Buy' ? 'LONG' : 'SHORT',
-entry: px, exit: px, qty: sz, pnl: pnl
-});
+if (fee > 0) allFees.push({ time: ts, fee });
+
+// Pas de PnL réalisé → fill d'ouverture, on suit le VWAP + accumule les frais
+if (pnl === 0 && !coin.includes('/')) {
+const isLong = dir.includes('Long') || dir === 'Buy';
+const key = coin + (isLong ? '_L' : '_S');
+const pos = positions[key];
+if (!pos || pos.totalSz < 1e-6) {
+positions[key] = { vwap: px, totalSz: sz, firstOpen: dt, totalFees: fee };
+} else {
+const newSz = pos.totalSz + sz;
+pos.vwap = (pos.vwap * pos.totalSz + px * sz) / newSz;
+pos.totalSz = newSz;
+pos.totalFees = (pos.totalFees || 0) + fee;
 }
 continue;
 }
 
-const isLong = dir.includes('Long');
-const key = coin + (isLong ? '_L' : '_S');
+// Fill avec PnL réalisé → closedPnl - frais open (prorata) - frais close
+const isShort = dir.includes('Short') || dir === 'Sell';
+const key = coin.includes('/') ? null : coin + (isShort ? '_S' : '_L');
+const pos = key ? positions[key] : null;
 
-if (dir.startsWith('Open')) {
-const pos = positions[key];
-if (!pos || pos.totalSz < 1e-6) {
-positions[key] = { opens: [{ dt, px, sz }], totalSz: sz };
-} else {
-pos.totalSz += sz;
-pos.opens.push({ dt, px, sz });
+// Frais d'ouverture au prorata de la taille clôturée
+let openFee = 0;
+if (pos && pos.totalSz > 1e-6 && pos.totalFees) {
+openFee = pos.totalFees * Math.min(sz / pos.totalSz, 1);
 }
-} else if (dir.startsWith('Close')) {
-const pos = positions[key] || null;
-const netPnl = pnl; // closedPnl HL = exactement le PnL affiché sur HL
-const firstOpen = pos && pos.opens.length ? pos.opens[0] : null;
+const totalFee = openFee + fee;
+const netPnl = pnl - totalFee;
 
 trades.push({
-source:'hl',
-openDate: firstOpen ? firstOpen.dt : dt,
+source: 'hl',
+openDate:  pos ? pos.firstOpen : dt,
 closeDate: dt,
 symbol: coin,
-direction: isLong ? 'LONG' : 'SHORT',
-entry: firstOpen ? firstOpen.px : null,
-exit: px, qty: sz, pnl: netPnl
+direction: isShort ? 'SHORT' : 'LONG',
+entry: pos ? pos.vwap : null,
+exit: px, qty: sz, fee: totalFee,
+volume: sz * px,
+pnl: netPnl
 });
 
 if (pos) {
+// Déduire les frais d'open consommés au prorata
+if (pos.totalFees) {
+pos.totalFees = Math.max(0, pos.totalFees - openFee);
+}
 pos.totalSz = Math.max(0, pos.totalSz - sz);
 if (pos.totalSz < 1e-6) positions[key] = null;
 }
 }
-}
+
+hlAllFees = allFees;
 return trades;
+}
+
+function parseHL(rows) {
+return parseHLData(rows, r => parseDate(r.time));
 }
 
 function parseIC(aoa) {
@@ -602,6 +669,8 @@ refresh();
 
 function clearAll() {
 allTrades = [];
+hlFunding = [];
+hlAllFees = [];
 ['hl','ic'].forEach(id => setDzStatus(id, null, null));
 refresh();
 }
@@ -747,9 +816,10 @@ renderDashboard();
 function renderDashboard() {
 const T = filtered();
 if (!T.length) {
-['k-total','k-wr','k-pnl','k-pf','k-exp','k-avg-w','k-avg-l','k-best','k-worst','k-long','k-short','k-streak']
+['k-total','k-wr','k-pnl','k-funding','k-pnl-net','k-pf','k-exp','k-avg-w','k-avg-l','k-best','k-worst','k-long','k-short','k-streak','k-volume','k-fees']
 .forEach(id => { const el=document.getElementById(id); if(el) el.textContent='—'; });
 destroyCharts();
+buildDashTrades([]);
 return;
 }
 
@@ -779,10 +849,22 @@ const swins = shorts.filter(t=>t.pnl>0).length;
 let maxStreak=0, cur=0;
 for (const t of actives) { if(t.pnl>0){cur++;maxStreak=Math.max(maxStreak,cur);}else{cur=0;} }
 
+// Funding HL filtré par période
+const [rs, re] = getRange();
+const fundingPeriod = hlFunding.filter(f => {
+  if (!rs || !re) return true;
+  const t = new Date(f.time);
+  return t >= rs && t <= re;
+});
+const totalFunding = fundingPeriod.reduce((s,f)=>s+f.usdc, 0);
+const totalNet = totalPnl + totalFunding;
+
 // KPIs
 set('k-total', T.length, 'var(--blue)');
 set('k-wr', n ? fmtPct(wr) : '—', wr>=0.5?'var(--green)':'var(--red)');
 setEl('k-pnl', fmtMoney(totalPnl, true), colorPnl(totalPnl));
+setEl('k-funding', hlFunding.length ? fmtMoney(totalFunding, true) : '—', hlFunding.length ? colorPnl(totalFunding) : 'var(--gray)');
+setEl('k-pnl-net', hlFunding.length ? fmtMoney(totalNet, true) : fmtMoney(totalPnl, true), colorPnl(hlFunding.length ? totalNet : totalPnl));
 set('k-pf', isFinite(pf)?pf.toFixed(2)+'x':'∞', pf>=1?'var(--acc)':'var(--red)');
 setEl('k-exp', n ? fmtMoney(exp, true) : '—', colorPnl(exp));
 set('k-avg-w', avgW?fmtMoney(avgW):'—', 'var(--green)');
@@ -794,12 +876,84 @@ setElSub('k-long','k-long-wr', longs.length?`Win: ${fmtPct(lwins/longs.length)}`
 set('k-short', shorts.length, 'var(--red)');
 setElSub('k-short','k-short-wr', shorts.length?`Win: ${fmtPct(swins/shorts.length)}`:'');
 set('k-streak', maxStreak, 'var(--acc)');
+const totalVolume = T.reduce((s,t)=>s+(t.volume||0), 0);
+// Frais = tous les fills (open + close) sur la période
+const feesPeriod = hlAllFees.filter(f => {
+  if (!rs || !re) return true;
+  const t = new Date(f.time);
+  return t >= rs && t <= re;
+});
+const totalFees = feesPeriod.reduce((s,f)=>s+f.fee, 0) || T.reduce((s,t)=>s+(t.fee||0), 0);
+set('k-volume', totalVolume ? '$'+Math.round(totalVolume).toLocaleString('fr-FR') : '—', 'var(--gray)');
+set('k-fees', totalFees ? fmtMoney(totalFees) : '—', 'var(--red)');
 
 document.getElementById('pnl-final').textContent =
 `→ ${fmtMoney(totalPnl,true)} sur ${T.length} trades`;
 
 buildCharts(T, n, wins, losses, totalPnl);
 buildAnalysisTables(T);
+buildDashTrades(T);
+}
+
+let dashSortCol = 'closeDate';
+let dashSortDir = -1;
+let lastDashTrades = [];
+
+function dashSortBy(col) {
+if (dashSortCol === col) { dashSortDir *= -1; }
+else { dashSortCol = col; dashSortDir = col === 'pnl' ? -1 : 1; }
+buildDashTrades(lastDashTrades);
+}
+
+function buildDashTrades(T) {
+lastDashTrades = T;
+const tbl = document.getElementById('dash-trades-tbl');
+const body = document.getElementById('dash-trades-body');
+const empty = document.getElementById('dash-trades-empty');
+const countEl = document.getElementById('dt-count');
+countEl.textContent = T.length + ' trade' + (T.length > 1 ? 's' : '');
+if (!T.length) { tbl.style.display='none'; empty.style.display='block'; return; }
+empty.style.display='none'; tbl.style.display='table';
+
+// Tri
+const sorted = [...T].sort((a,b) => {
+const av = getSortVal(a, dashSortCol), bv = getSortVal(b, dashSortCol);
+if (av < bv) return -dashSortDir;
+if (av > bv) return dashSortDir;
+return 0;
+});
+
+// Flèches
+const dtThs = document.querySelectorAll('#dash-trades-tbl thead th.sortable');
+const dtCols = ['pnl','result','source','symbol','direction','openDate','closeDate','entry','exit','qty'];
+dtThs.forEach(th => th.classList.remove('sort-asc','sort-desc'));
+const dtIdx = dtCols.indexOf(dashSortCol);
+if (dtIdx >= 0 && dtThs[dtIdx]) dtThs[dtIdx].classList.add(dashSortDir === 1 ? 'sort-asc' : 'sort-desc');
+
+body.innerHTML = sorted.map((t,i) => {
+const be = isBE(t);
+const w = t.pnl > BE_THRESHOLD;
+const src = t.source==='hl'
+? '<span class="tag src-hl">⚡ HL</span>'
+: '<span class="tag src-ic">📈 IC</span>';
+const pnlColor = be ? 'var(--blue)' : colorPnl(t.pnl);
+const resultTag = be
+? '<span class="tag be">🔵 BE</span>'
+: `<span class="tag ${w?'win':'loss'}">${w?'✅ Win':'❌ Loss'}</span>`;
+return `<tr>
+<td style="font-weight:700;color:${pnlColor}">${t.pnl>=0?'+':''}${fmtMoney(t.pnl)}</td>
+<td>${resultTag}</td>
+<td style="color:var(--gray)">${i+1}</td>
+<td>${src}</td>
+<td><strong>${t.symbol}</strong></td>
+<td><span class="tag ${t.direction==='LONG'?'long':'short'}">${t.direction}</span></td>
+<td style="color:var(--gray)">${fmtDate(t.openDate)}</td>
+<td style="color:var(--gray)">${fmtDate(t.closeDate)}</td>
+<td>${t.entry!=null?fmtNum(t.entry):'—'}</td>
+<td>${t.exit!=null?fmtNum(t.exit):'—'}</td>
+<td style="color:var(--gray)">${t.qty!=null?fmtNum(t.qty):'—'}</td>
+</tr>`;
+}).join('');
 }
 
 function set(id, val, color) {
@@ -1028,6 +1182,125 @@ return `<tr>
 <td style="color:${wr>=0.5?'var(--green)':'var(--red)'}">${fmtPct(wr)}</td>
 </tr>`;
 }).join('');
+}
+
+// ─── AUTO-REFRESH ──────────────────────────────────────────────────────────
+(function() {
+  const saved = localStorage.getItem('hl_addr');
+  if (saved) { const el = document.getElementById('hl-address'); if (el) el.value = saved; }
+})();
+
+async function refreshResults() {
+  const btn = document.getElementById('btn-refresh');
+  const status = document.getElementById('refresh-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours…';
+  status.innerHTML = '';
+  const lines = [];
+
+  // ── Hyperliquid ────────────────────────────────────────────────────────
+  const addr = (document.getElementById('hl-address')?.value || '').trim();
+  localStorage.setItem('hl_addr', addr);
+  if (addr) {
+    try {
+      status.innerHTML = '⏳ Hyperliquid…';
+      const [fills, funding] = await Promise.all([fetchHLFills(addr), fetchHLFunding(addr)]);
+      const trades = parseHLFills(fills);
+      hlFunding = funding;
+      mergeSource(trades, 'hl');
+      const fundingSum = funding.reduce((s,f)=>s+f.usdc, 0);
+      const fundingStr = fundingSum >= 0 ? `+$${fundingSum.toFixed(2)}` : `-$${Math.abs(fundingSum).toFixed(2)}`;
+      setDzStatus('hl', `✓ ${trades.length} trades · funding ${fundingStr} (API)`, true);
+      lines.push(`✅ HL : ${trades.length} trades`);
+    } catch(e) {
+      lines.push(`❌ HL : ${e.message}`);
+      setDzStatus('hl', '✗ Erreur API', false);
+    }
+  }
+
+  // ── MT5 bridge (EA on-demand) ──────────────────────────────────────────
+  try {
+    status.innerHTML = lines.join('<br>') + '<br>⏳ MT5…';
+    const resp = await fetch('http://localhost:5001/mt5');
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    const trades = parseMT5JSON(data);
+    mergeSource(trades, 'ic');
+    setDzStatus('ic', `✓ ${trades.length} trades (EA)`, true);
+    lines.push(`✅ MT5 : ${trades.length} trades`);
+  } catch(e) {
+    const msg = e.message || '';
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('refused') || msg.includes('fetch')) {
+      lines.push('⚠️ MT5 bridge non démarré (voir mt5_bridge.py)');
+    } else {
+      lines.push(`❌ MT5 : ${msg}`);
+    }
+  }
+
+  status.innerHTML = lines.join('<br>') || '—';
+  btn.disabled = false;
+  btn.textContent = '🔄 Refresh Results';
+}
+
+async function fetchHLFunding(address) {
+  try {
+    const resp = await fetch('https://api.hyperliquid.xyz/info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'userFunding', user: address })
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (!Array.isArray(data)) return [];
+    // Réponse HL : [{ time, hash, delta: { type, coin, usdc, szi, fundingRate } }]
+    return data.map(f => ({ time: f.time, coin: f.delta?.coin || '', usdc: parseFloat(f.delta?.usdc) || 0 }));
+  } catch(e) { return []; }
+}
+
+async function fetchHLFills(address) {
+  const resp = await fetch('https://api.hyperliquid.xyz/info', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'userFills', user: address })
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (!Array.isArray(data)) throw new Error('Réponse inattendue — vérifie l\'adresse');
+  return data;
+}
+
+function parseHLFills(fills) {
+  fills = [...fills].sort((a, b) => a.time - b.time);
+  return parseHLData(fills, f => new Date(f.time));
+}
+
+// ─── PARSEUR MT5 JSON (depuis EA JournalExport) ────────────────────────────
+function parseMT5Date(s) {
+  if (!s) return null;
+  // Format MT5 TimeToString : "2024.01.15 10:30:00"
+  const m = s.match(/^(\d{4})\.(\d{2})\.(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+  return null;
+}
+
+function parseMT5JSON(data) {
+  if (!Array.isArray(data)) return [];
+  return data
+    .filter(d => d.close_time) // positions clôturées seulement
+    .map(d => ({
+      source:    'ic',
+      openDate:  parseMT5Date(d.open_time),
+      closeDate: parseMT5Date(d.close_time),
+      symbol:    d.symbol || '?',
+      direction: d.direction || 'LONG',
+      entry:     d.open_price  || null,
+      exit:      d.close_price || null,
+      qty:       d.volume      || null,
+      pnl:       d.net_pnl     || 0   // profit + commission + swap
+    }));
 }
 
 // ─── EXPORT XLSX ────────────────────────────────────────────────────────────
